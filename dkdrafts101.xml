@@ -1,0 +1,419 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<product productid="dkdrafts" active="1">
+	<title>DkDrafts</title>
+	<description>LocalStorage Drafts (c) 2015 DKameleon</description>
+	<version>1.0.1</version>
+	<url />
+	<versioncheckurl />
+	<dependencies>
+	</dependencies>
+	<codes>
+		<code version="1.0.1">
+			<installcode><![CDATA[ ]]></installcode>
+			<uninstallcode><![CDATA[ ]]></uninstallcode>
+		</code>
+	</codes>
+	<templates>
+		<template name="dkdrafts_header" templatetype="template" date="" username="dkameleon" version="1.0.1"><![CDATA[ 
+<script type="text/javascript">
+if (window.localStorage) {
+
+	function dkdLoadScript(url, callback){
+		var script = document.createElement("script")
+		script.type = "text/javascript";
+		if (script.readyState){  //IE
+			script.onreadystatechange = function(){
+				if (script.readyState == "loaded" || script.readyState == "complete"){
+					script.onreadystatechange = null;
+					callback();
+				}
+			};
+		} else {  //Others
+			script.onload = function(){
+				callback();
+			};
+		}
+		script.src = url;
+		document.getElementsByTagName("head")[0].appendChild(script);
+	}
+
+	var dkdraft = {};
+	var dkdraft_index = '';
+	var dkdraft_cookie = '$dkdraft_cookie';
+
+	function dkDraftStore(name, value) {
+		if (dkdraft[name] == value) { return; }
+		var now = new Date();
+		dkdraft.time = now.toISOString();
+		now.setMonth(now.getMonth() + 1);
+		dkdraft.expires = now.toISOString();
+		dkdraft[name] = value;
+		try {
+			localStorage.setItem(dkdraft_index, JSON.stringify(dkdraft));
+		} catch (e) { }
+	}
+
+	function dkDraftUpdateHtml(e) {
+		var name = 'message';
+		var value = $(this).html().trim();
+		if (value.replace('<br>', '') == '') { value = ''; }
+		if (value == '') { return localStorage.removeItem(dkdraft_index); }
+		return dkDraftStore(name, value);
+	}
+
+	function dkDraftUpdate(e) {
+		var name = $(this).attr('name');
+		var value = $(this).val().trim();
+		if (name == 'message' && value == '') { return localStorage.removeItem(dkdraft_index); }
+		return dkDraftStore(name, value);
+	}
+
+	function dkCreateCookie(name,value,days) {
+		if (days) {
+			var date = new Date();
+			date.setTime(date.getTime()+(days*24*60*60*1000));
+			var expires = "; expires="+date.toGMTString();
+		}
+		else var expires = "";
+		document.cookie = name+"="+value+expires+"; path=/";
+	}
+
+	function dkReadCookie(name) {
+		var nameEQ = name + "=";
+		var ca = document.cookie.split(';');
+		for(var i=0;i < ca.length;i++) {
+			var c = ca[i];
+			while (c.charAt(0)==' ') c = c.substring(1,c.length);
+			if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
+		}
+		return null;
+	}
+
+	function dkEraseCookie(name) {
+		dkCreateCookie(name,"",-1);
+	}
+
+	function dkDraftCookie() {
+		var remove = dkReadCookie(dkdraft_cookie);
+		if (remove) {
+			localStorage.removeItem(remove);
+			dkEraseCookie(dkdraft_cookie);
+		}
+	}
+
+	function dkDraftsCleanup() {
+		var saved = '$dkdraft_remove';
+		if (saved) { localStorage.removeItem(saved); }
+		setInterval(dkDraftCookie, 5000);
+
+		for (var index in localStorage){
+			if (index.substring(0, 8) == 'dkdraft.') {
+				try {
+					var dkdtemp = localStorage.getItem(index);
+					dkdtemp = JSON.parse(dkdtemp);
+					if (dkdtemp) {
+						var now = new Date();
+						if (dkdtemp.expires <= now.toISOString()) { localStorage.removeItem(index); continue; }
+					}
+				} catch (e) { 
+					localStorage.removeItem(index);
+				}
+			}
+		}
+	}
+
+	function dkDraftsTrigger() {
+		var input = $('textarea[name=message]');
+		if (input.size() > 0) {
+			var form          = input.eq(0).closest('form');
+			var message       = form.find('[name=message]');
+			message.trigger('input');
+		}
+		var vbEditorName = null;
+		if (vB_Editor) { for (var i in vB_Editor) { vbEditorName = i; break; } }
+		var messageHtml = $('#' + vbEditorName + '_iframe');
+		if (messageHtml.size() > 0 ) { messageHtml.contents().find('body').trigger('input'); }	
+	}
+
+	function dkDraftsInit() {
+		dkDraftsCleanup();
+		
+		var input = $('textarea[name=message]');
+		if (input.size() > 0) {
+			var form          = input.eq(0).closest('form');
+			var message       = form.find('[name=message]');
+			var recipients    = form.find('[name=recipients]');
+			var bccrecipients = form.find('[name=bccrecipients]');
+			var title         = form.find('[name=title]');
+			var subject       = form.find('[name=subject]');
+
+			dkdraft.message       = message.val();
+			dkdraft.recipients    = recipients.val();
+			dkdraft.bccrecipients = bccrecipients.val();
+			dkdraft.title         = title.val();
+			dkdraft.subject       = subject.val();
+			dkdraft.do            = form.find('[name=do]').val();
+			dkdraft.pmid          = form.find('[name=pmid]').val();
+			dkdraft.forward       = form.find('[name=forward]').val();
+			dkdraft.f             = form.find('[name=f]').val();
+			dkdraft.t             = form.find('[name=t]').val();
+
+			if (dkdraft.pmid == '0') { dkdraft.pmid = ''; }
+			if (dkdraft.do == 'insertpm'  ) { dkdraft_index = (dkdraft.pmid == '') ? 'dkdraft.pm.new' : 'dkdraft.pm.' + dkdraft.pmid + '.' + dkdraft.forward; }
+			if (dkdraft.do == 'postthread') { dkdraft_index = 'dkdraft.thread.' + dkdraft.f; }
+			if (dkdraft.do == 'postreply' ) { dkdraft_index = 'dkdraft.reply.' + dkdraft.t; }
+
+			if (dkdraft_index != '') {
+				var vbEditorName = null;
+				if (vB_Editor) { for (var i in vB_Editor) { vbEditorName = i; break; } }
+
+				try {
+					var dkdtemp = localStorage.getItem(dkdraft_index);
+					dkdtemp = JSON.parse(dkdtemp);
+					if (dkdtemp) {
+						dkdraft = dkdtemp;
+
+						if (vbEditorName) vB_Editor[vbEditorName].write_editor_contents(dkdraft.message, true);
+
+						recipients.val(dkdraft.recipients);
+						bccrecipients.val(dkdraft.bccrecipients);
+						title.val(dkdraft.title);
+						subject.val(dkdraft.subject);
+					}
+				} catch (e) { }
+
+				$('#' + vbEditorName + '_cmd_switchmode').on('click', function() {
+					var vbEditorName = null;
+					if (vB_Editor) { for (var i in vB_Editor) { vbEditorName = i; break; } }
+					var messageHtml = $('#' + vbEditorName + '_iframe');
+					if (messageHtml.size() > 0 ) { messageHtml.contents().find('body').on('blur focus input keyup propertychange', dkDraftUpdateHtml); }
+				});
+				var messageHtml = $('#' + vbEditorName + '_iframe');
+				if (messageHtml.size() > 0 ) { messageHtml.contents().find('body').on('blur focus input keyup propertychange', dkDraftUpdateHtml); }
+
+				$('#' + vbEditorName + '_controls *').on('click', dkDraftsTrigger);
+				message.on('blur focus input keyup propertychange', dkDraftUpdate);
+				recipients.on('blur focus input keyup propertychange', dkDraftUpdate);
+				bccrecipients.on('blur focus input keyup propertychange', dkDraftUpdate);
+				title.on('blur focus input keyup propertychange', dkDraftUpdate);
+				subject.on('blur focus input keyup propertychange', dkDraftUpdate);
+				var dkDraftId = $('<input/>').attr('type', 'hidden').attr('name', 'dkdraft_index').val(dkdraft_index);
+				form.append(dkDraftId);
+			}
+		}
+	}
+
+	if(typeof window.jQuery == 'undefined') {
+		dkdLoadScript('https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js', function() { $(dkDraftsInit); });
+	} else {
+		$(dkDraftsInit);
+	}
+
+}
+</script>
+]]></template>
+		<template name="dkdrafts_list" templatetype="template" date="" username="dkameleon" version="1.0.1"><![CDATA[
+<script type="text/javascript">
+if (window.localStorage) {
+
+	function dkdLoadScript(url, callback){
+		var script = document.createElement("script")
+		script.type = "text/javascript";
+		if (script.readyState){  //IE
+			script.onreadystatechange = function(){
+				if (script.readyState == "loaded" || script.readyState == "complete"){
+					script.onreadystatechange = null;
+					callback();
+				}
+			};
+		} else {  //Others
+			script.onload = function(){
+				callback();
+			};
+		}
+		script.src = url;
+		document.getElementsByTagName("head")[0].appendChild(script);
+	}
+
+	function dkDraftsShow() {
+		$('tbody.dkdrafts tr.row').remove();
+		
+		var tpl = $('tbody.dkdrafts tr.template').clone();
+		tpl.css({ 'display' : 'table-row' });
+		tpl.addClass('row');
+		var count = 0;
+		
+		for (var index in localStorage){
+			if (index.substring(0, 8) == 'dkdraft.') {
+				try {
+					var dkdtemp = localStorage.getItem(index);
+					dkdtemp = JSON.parse(dkdtemp);
+					if (dkdtemp) {
+						var now = new Date();
+						if (dkdtemp.expires <= now.toISOString()) { localStorage.removeItem(index); continue; }
+
+						var item = tpl.clone();
+						var href = '';
+						
+						if (dkdtemp.do == 'insertpm') { 
+							href = 'private.php?do=newpm' 
+							if (dkdtemp.pmid) { href += '&pmid=' + dkdtemp.pmid }
+							if (dkdtemp.forward) { href += '&forward=' + dkdtemp.forward }
+						}
+						if (dkdtemp.do == 'postthread') { href = 'newthread.php?do=newthread&f=' + dkdtemp.f; }
+						if (dkdtemp.do == 'postreply') { href = 'newreply.php?do=newreply&t=' + dkdtemp.t; }
+
+						var topic = '';
+						if (dkdtemp.do == 'insertpm'  ) { topic = '$vbphrase[dkdrafts_pm]: '; }
+						if (dkdtemp.do == 'postthread') { topic = '$vbphrase[dkdrafts_thread]: '; }
+						if (dkdtemp.do == 'postreply' ) { topic = '$vbphrase[dkdrafts_reply]: '; }
+			
+						if (!dkdtemp.title) { dkdtemp.title = dkdtemp.subject; }
+						if (!dkdtemp.title) { dkdtemp.title = '[$vbphrase[dkdrafts_notitle]]'; }
+						dkdtemp.title = dkdtemp.title ? $('<div/>').append(dkdtemp.title).text() : '';
+						if (dkdtemp.title.length > 200) { dkdtemp.title = dkdtemp.title.substring(0, 200) + '...'; }
+						dkdtemp.message = dkdtemp.message ? $('<div/>').append(dkdtemp.message).text() : '';
+						if (dkdtemp.message.length > 200) { dkdtemp.message = dkdtemp.message.substring(0, 200) + '...'; }
+
+						item.find('.topic').html(topic);
+						item.find('.title').html(dkdtemp.title);
+						item.find('.title').attr('href', href);
+						item.find('.message').html(dkdtemp.message.replace('\n', '<br/>'));
+						item.find('.time').html(dkdtemp.time ? dkdtemp.time.substring(0, 19).replace('T', ' ') : '');
+
+						item.find('.delete').prop('index', index);
+						item.find('.delete').on('click', function(e) { 
+							e.preventDefault();
+							var index = $(this).prop('index');
+							localStorage.removeItem(index);
+							dkDraftsShow();
+							return false;
+						});
+
+						$('tbody.dkdrafts').append(item);
+						count++;
+					} else {
+						localStorage.removeItem(index);
+					}
+				} catch (e) { 
+					localStorage.removeItem(index);
+				}
+			}
+		}
+		if (count == 0) { 
+			$('tbody.dkdrafts tr.empty').show();
+		} else {
+			$('tbody.dkdrafts tr.thead').show();
+		}
+		$('span.dkdrafts').html(count);
+	}
+
+	if(typeof window.jQuery == 'undefined') {
+		dkdLoadScript('https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js', function() { $(dkDraftsShow); });
+	} else {
+		$(dkDraftsShow);
+	}
+
+}
+</script>
+<table class="tborder" cellpadding="$stylevar[cellpadding]" cellspacing="$stylevar[cellspacing]" border="0" width="100%" align="center">
+<thead>
+	<tr>
+		<td class="tcat" colspan="3">
+			<a style="float:$stylevar[right]" href="#top" onclick="return toggle_collapse('usercp_drafts')"><img id="collapseimg_usercp_drafts" src="$stylevar[imgdir_button]/collapse_tcat$vbcollapse[collapseimg_usercp_drafts].gif" alt="" border="0" /></a>
+			$vbphrase[dkdrafts_title]<span class="normal">: <span class="dkdrafts">0</span></span>
+		</td>
+	</tr>
+</thead>
+<tbody id="collapseobj_usercp_drafts" style="$vbcollapse[collapseobj_usercp_drafts]" class="dkdrafts">
+	<tr class="thead"  style="display: none;">
+		<td class="thead" width="100%">$vbphrase[thread]</td>
+		<td class="thead" width="100">$vbphrase[date]</td>
+		<td class="thead" width="100">&nbsp;</td>
+	</tr>
+	<tr class="empty" style="display: none;">
+		<td class="alt1" align="center" colspan="3">
+			<strong>$vbphrase[dkdrafts_nodrafts]</strong>
+		</td>
+	</tr>
+	<tr class="template" style="display: none;">
+		<td class="alt2">
+			<div style="overflow: hidden; text-overflow: ellipsis;"><b class="topic"></b><a href="" class="title"></a></div>
+			<div style="overflow: hidden; text-overflow: ellipsis; margin-top: 3px;" class="message smallfont"></div>
+		</td>
+		<td class="alt1" align="center"><div class="time"></div></td>
+		<td class="alt2"><a href="" class="delete">$vbphrase[dkdrafts_delete]</a></td>
+	</tr>
+</tbody>
+</table>
+<br />
+		]]></template>
+	</templates>
+	<plugins>
+		<plugin active="1" executionorder="5">
+			<title>DkDrafts templates</title>
+			<hookname>cache_templates</hookname>
+			<phpcode><![CDATA[
+$globaltemplates = array_merge($globaltemplates, array( 'dkdrafts_header', 'dkdrafts_list' ));
+]]></phpcode>
+		</plugin>
+		<plugin active="1" executionorder="5">
+			<title>DkDrafts header</title>
+			<hookname>global_setup_complete</hookname>
+			<phpcode><![CDATA[
+if (in_array(THIS_SCRIPT, array('private', 'showthread', 'newthread', 'newreply')) && $vbulletin->userinfo['userid']) {
+	$dkdraft_cookie = COOKIE_PREFIX . 'dkdraft_remove';
+	$dkdraft_remove = $vbulletin->input->clean_gpc('c', COOKIE_PREFIX . 'dkdraft_remove', TYPE_NOCLEAN);
+	eval('$headinclude.="'.fetch_template('dkdrafts_header').'";');
+}
+]]></phpcode>
+		</plugin>
+		<plugin active="1" executionorder="5">
+			<title>DkDrafts list</title>
+			<hookname>usercp_complete</hookname>
+			<phpcode><![CDATA[
+eval('$template_hook["usercp_main_pos4"].="'.fetch_template('dkdrafts_list').'";');
+]]></phpcode>
+		</plugin>
+		<plugin active="1" executionorder="5">
+			<title>DkDrafts newpost</title>
+			<hookname>newpost_complete</hookname>
+			<phpcode><![CDATA[
+if (in_array(THIS_SCRIPT, array('private', 'showthread', 'newthread', 'newreply')) && $vbulletin->userinfo['userid']) {
+	$dkdraft_index = $vbulletin->input->clean_gpc('r', 'dkdraft_index', TYPE_NOCLEAN);
+	vbsetcookie('dkdraft_remove', $dkdraft_index);
+}
+]]></phpcode>
+		</plugin>
+		<plugin active="1" executionorder="5">
+			<title>DkDrafts insertpm</title>
+			<hookname>private_insertpm_complete</hookname>
+			<phpcode><![CDATA[
+if (in_array(THIS_SCRIPT, array('private', 'showthread', 'newthread', 'newreply')) && $vbulletin->userinfo['userid']) {
+	$dkdraft_index = $vbulletin->input->clean_gpc('r', 'dkdraft_index', TYPE_NOCLEAN);
+	vbsetcookie('dkdraft_remove', $dkdraft_index);
+}
+]]></phpcode>
+		</plugin>
+	</plugins>
+	<phrases>
+		<phrasetype name="General" fieldname="global">
+			<phrase name="dkdrafts_title" date="" username="dkameleon" version="1.0.1"><![CDATA[Drafts]]></phrase>
+			<phrase name="dkdrafts_notitle" date="" username="dkameleon" version="1.0.1"><![CDATA[No title]]></phrase>
+			<phrase name="dkdrafts_nodrafts" date="" username="dkameleon" version="1.0.1"><![CDATA[No drafts]]></phrase>
+			<phrase name="dkdrafts_delete" date="" username="dkameleon" version="1.0.1"><![CDATA[Delete]]></phrase>
+			<phrase name="dkdrafts_pm" date="" username="dkameleon" version="1.0.1"><![CDATA[Private message]]></phrase>
+			<phrase name="dkdrafts_thread" date="" username="dkameleon" version="1.0.1"><![CDATA[New thread]]></phrase>
+			<phrase name="dkdrafts_reply" date="" username="dkameleon" version="1.0.1"><![CDATA[Thread reply]]></phrase>
+		</phrasetype>
+	</phrases>
+	<options>
+	</options>
+	<helptopics>
+	</helptopics>
+	<cronentries>
+	</cronentries>
+	<faqentries>
+	</faqentries>
+</product>
